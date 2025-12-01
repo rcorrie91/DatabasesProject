@@ -20,7 +20,7 @@ function RegisterPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Registration attempt:', formData);
+    navigate('/dashboard');
   };
 
   return (
