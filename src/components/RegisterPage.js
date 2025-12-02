@@ -10,7 +10,11 @@ function RegisterPage() {
     nickname: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    profileImage: '',
+    city: '',
+    state: '',
+    country: ''
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -51,7 +55,11 @@ function RegisterPage() {
           last_name: formData.lastName,
           nickname: formData.nickname,
           email: formData.email,
-          password: formData.password
+          password: formData.password,
+          profile_image: formData.profileImage,
+          city: formData.city,
+          state: formData.state,
+          country: formData.country
         }),
       });
 
@@ -114,6 +122,50 @@ function RegisterPage() {
                 onChange={handleChange}
                 required
                 placeholder="Enter your nickname"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="profileImage">Profile Image URL</label>
+              <input
+                type="url"
+                id="profileImage"
+                name="profileImage"
+                value={formData.profileImage}
+                onChange={handleChange}
+                placeholder="Enter profile image URL (optional)"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="city">City</label>
+              <input
+                type="text"
+                id="city"
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                placeholder="Enter your city (optional)"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="state">State</label>
+              <input
+                type="text"
+                id="state"
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                placeholder="Enter your state (optional)"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="country">Country</label>
+              <input
+                type="text"
+                id="country"
+                name="country"
+                value={formData.country}
+                onChange={handleChange}
+                placeholder="Enter your country (optional)"
               />
             </div>
             <div className="form-group">

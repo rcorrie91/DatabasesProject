@@ -44,7 +44,7 @@ const db = new sqlite3.Database('./music_artists.db', (err) => {
 });
 
 app.post('/api/register', async (req, res) => {
-  const { email, password, first_name, last_name, nickname } = req.body;
+  const { email, password, first_name, last_name, nickname, profile_image, city, state, country } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
@@ -74,10 +74,23 @@ app.post('/api/register', async (req, res) => {
             return res.status(500).json({ error: 'Failed to create account' });
           }
 
-          res.status(201).json({
-            message: 'Account created successfully',
-            userId: this.lastID
-          });
+          const userId = this.lastID;
+
+          // Create user profile with additional information
+          db.run(
+            'INSERT INTO user_profiles (user_id, profile_image_url, city, state, country) VALUES (?, ?, ?, ?, ?)',
+            [userId, profile_image || null, city || null, state || null, country || null],
+            function(profileErr) {
+              if (profileErr) {
+                console.error('Error creating user profile:', profileErr);
+              }
+
+              res.status(201).json({
+                message: 'Account created successfully',
+                userId: userId
+              });
+            }
+          );
         }
       );
     });
