@@ -5,22 +5,68 @@ import './AuthPage.css';
 function RegisterPage() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
+    nickname: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
+    setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    navigate('/dashboard');
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:3001/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          nickname: formData.nickname,
+          email: formData.email,
+          password: formData.password
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        navigate('/login');
+      } else {
+        setError(data.error);
+      }
+    } catch (error) {
+      setError('Connection error. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -32,17 +78,42 @@ function RegisterPage() {
         <div className="auth-card">
           <h1 className="auth-title">Register</h1>
           <p className="auth-subtitle">Create a new account to get started.</p>
+          {error && <div className="error-message">{error}</div>}
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="form-group">
-              <label htmlFor="name">Full Name</label>
+              <label htmlFor="firstName">First Name</label>
               <input
                 type="text"
-                id="name"
-                name="name"
-                value={formData.name}
+                id="firstName"
+                name="firstName"
+                value={formData.firstName}
                 onChange={handleChange}
                 required
-                placeholder="Enter your full name"
+                placeholder="Enter your first name"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="lastName">Last Name</label>
+              <input
+                type="text"
+                id="lastName"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
+                required
+                placeholder="Enter your last name"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="nickname">Nickname</label>
+              <input
+                type="text"
+                id="nickname"
+                name="nickname"
+                value={formData.nickname}
+                onChange={handleChange}
+                required
+                placeholder="Enter your nickname"
               />
             </div>
             <div className="form-group">
@@ -81,8 +152,8 @@ function RegisterPage() {
                 placeholder="Confirm your password"
               />
             </div>
-            <button type="submit" className="auth-submit-btn">
-              Register
+            <button type="submit" className="auth-submit-btn" disabled={isLoading}>
+              {isLoading ? 'Creating Account...' : 'Register'}
             </button>
             <p className="auth-switch">
               Already have an account? <Link to="/login">Login here</Link>
