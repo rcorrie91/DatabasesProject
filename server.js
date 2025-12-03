@@ -3,6 +3,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -10,15 +11,75 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Helper function to generate session token
+function generateSessionToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// Helper function to create a session
+function createSession(userId, callback) {
+  const sessionToken = generateSessionToken();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+
+  db.run(
+    `INSERT INTO user_sessions (user_id, session_token, expires_at, is_active)
+     VALUES (?, ?, ?, 1)`,
+    [userId, sessionToken, expiresAt.toISOString()],
+    function(err) {
+      if (err) {
+        callback(err, null);
+      } else {
+        callback(null, { sessionToken, expiresAt, sessionId: this.lastID });
+      }
+    }
+  );
+}
+
+// Helper function to validate session
+function validateSession(sessionToken, callback) {
+  db.get(
+    `SELECT us.*, u.email, u.first_name, u.last_name, u.nickname
+     FROM user_sessions us
+     JOIN users u ON us.user_id = u.id
+     WHERE us.session_token = ?
+       AND us.is_active = 1
+       AND datetime(us.expires_at) > datetime('now')`,
+    [sessionToken],
+    callback
+  );
+}
+
+// Helper function to deactivate session
+function deactivateSession(sessionToken, callback) {
+  db.run(
+    `UPDATE user_sessions SET is_active = 0 WHERE session_token = ?`,
+    [sessionToken],
+    callback
+  );
+}
+
+// Helper function to clean up expired sessions
+function cleanupExpiredSessions() {
+  db.run(
+    `UPDATE user_sessions SET is_active = 0
+     WHERE is_active = 1 AND datetime(expires_at) < datetime('now')`,
+    (err) => {
+      if (err) {
+        console.error('Error cleaning up expired sessions:', err);
+      }
+    }
+  );
+}
+
 const db = new sqlite3.Database('./music_artists.db', (err) => {
   if (err) {
     console.error('Error opening database:', err);
   } else {
     console.log('Connected to music_artists.db database');
     console.log('All user and artist tables are already set up and ready to use');
-    
+
     db.run(`
-      CREATE TRIGGER IF NOT EXISTS update_users_timestamp 
+      CREATE TRIGGER IF NOT EXISTS update_users_timestamp
       AFTER UPDATE ON users
       BEGIN
         UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
@@ -30,7 +91,7 @@ const db = new sqlite3.Database('./music_artists.db', (err) => {
     });
 
     db.run(`
-      CREATE TRIGGER IF NOT EXISTS update_profiles_timestamp 
+      CREATE TRIGGER IF NOT EXISTS update_profiles_timestamp
       AFTER UPDATE ON user_profiles
       BEGIN
         UPDATE user_profiles SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
@@ -40,6 +101,11 @@ const db = new sqlite3.Database('./music_artists.db', (err) => {
         console.error('Error creating profiles update trigger:', err);
       }
     });
+
+    // Run cleanup on startup
+    cleanupExpiredSessions();
+    // Run cleanup every hour
+    setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
   }
 });
 
@@ -101,7 +167,7 @@ app.post('/api/register', async (req, res) => {
 
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
-  
+
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
@@ -110,20 +176,21 @@ app.post('/api/login', (req, res) => {
     if (err) {
       return res.status(500).json({ error: 'Database error' });
     }
-    
+
     if (!user) {
-      return res.status(401).json({ 
-        error: 'No account found with this email. Please create a new account.' 
+      return res.status(401).json({
+        error: 'No account found with this email. Please create a new account.'
       });
     }
 
     try {
       const isValidPassword = await bcrypt.compare(password, user.password);
-      
+
       if (!isValidPassword) {
         return res.status(401).json({ error: 'Invalid password' });
       }
 
+      // Update last login timestamp
       db.run(
         'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?',
         [user.id],
@@ -133,21 +200,99 @@ app.post('/api/login', (req, res) => {
           }
         }
       );
-      
-      res.json({
-        message: 'Login successful',
-        user: {
-          id: user.id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
-          nickname: user.nickname
+
+      // Create a new session
+      createSession(user.id, (err, sessionData) => {
+        if (err) {
+          console.error('Error creating session:', err);
+          return res.status(500).json({ error: 'Failed to create session' });
         }
+
+        res.json({
+          message: 'Login successful',
+          sessionToken: sessionData.sessionToken,
+          expiresAt: sessionData.expiresAt,
+          user: {
+            id: user.id,
+            email: user.email,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            nickname: user.nickname
+          }
+        });
       });
     } catch (error) {
       res.status(500).json({ error: 'Server error' });
     }
   });
+});
+
+// Logout endpoint
+app.post('/api/logout', (req, res) => {
+  const { sessionToken } = req.body;
+
+  if (!sessionToken) {
+    return res.status(400).json({ error: 'Session token is required' });
+  }
+
+  deactivateSession(sessionToken, (err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to logout' });
+    }
+
+    res.json({ message: 'Logged out successfully' });
+  });
+});
+
+// Validate session endpoint
+app.post('/api/validate-session', (req, res) => {
+  const { sessionToken } = req.body;
+
+  if (!sessionToken) {
+    return res.status(400).json({ error: 'Session token is required' });
+  }
+
+  validateSession(sessionToken, (err, session) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (!session) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    res.json({
+      valid: true,
+      user: {
+        id: session.user_id,
+        email: session.email,
+        first_name: session.first_name,
+        last_name: session.last_name,
+        nickname: session.nickname
+      },
+      expiresAt: session.expires_at
+    });
+  });
+});
+
+// Get active sessions for a user
+app.get('/api/user/:userId/sessions', (req, res) => {
+  const { userId } = req.params;
+
+  db.all(
+    `SELECT id, session_token, created_at, expires_at, is_active
+     FROM user_sessions
+     WHERE user_id = ?
+     ORDER BY created_at DESC`,
+    [userId],
+    (err, sessions) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      res.json(sessions);
+    }
+  );
 });
 
 app.get('/api/health', (req, res) => {
@@ -249,6 +394,146 @@ app.get('/api/artists/:artistId', (req, res) => {
       );
     }
   );
+});
+
+// Add artist to user's tracking list
+app.post('/api/user/:userId/artists', (req, res) => {
+  const { userId } = req.params;
+  const { artist_id, date_seen, venue, city, notes } = req.body;
+
+  if (!artist_id) {
+    return res.status(400).json({ error: 'Artist ID is required' });
+  }
+
+  db.run(
+    `INSERT INTO user_artist_tracking (user_id, artist_id, date_seen, venue, city, notes)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [userId, artist_id, date_seen || null, venue || null, city || null, notes || null],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Failed to add artist' });
+      }
+
+      res.status(201).json({
+        message: 'Artist added successfully',
+        trackingId: this.lastID
+      });
+    }
+  );
+});
+
+// Get users who have also seen a specific artist
+app.get('/api/artists/:artistId/fans', (req, res) => {
+  const { artistId } = req.params;
+
+  db.all(
+    `SELECT DISTINCT
+       u.id,
+       u.first_name,
+       u.last_name,
+       u.nickname,
+       up.profile_image_url,
+       up.city,
+       up.state,
+       COUNT(uat.artist_id) as times_seen
+     FROM user_artist_tracking uat
+     JOIN users u ON uat.user_id = u.id
+     LEFT JOIN user_profiles up ON u.id = up.user_id
+     WHERE uat.artist_id = ?
+     GROUP BY u.id, u.first_name, u.last_name, u.nickname, up.profile_image_url, up.city, up.state
+     ORDER BY times_seen DESC, u.nickname`,
+    [artistId],
+    (err, fans) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      res.json(fans);
+    }
+  );
+});
+
+// Get user's tracked artists
+app.get('/api/user/:userId/artists', (req, res) => {
+  const { userId } = req.params;
+
+  db.all(
+    `SELECT
+       uat.id as tracking_id,
+       uat.artist_id,
+       uat.date_seen,
+       uat.venue,
+       uat.city,
+       uat.notes,
+       a.artist_name,
+       a.artist_img,
+       a.country
+     FROM user_artist_tracking uat
+     JOIN artists a ON uat.artist_id = a.artist_id
+     WHERE uat.user_id = ?
+     ORDER BY uat.date_seen DESC, uat.id DESC`,
+    [userId],
+    (err, artists) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      res.json(artists);
+    }
+  );
+});
+
+// Change user password
+app.post('/api/user/:userId/change-password', async (req, res) => {
+  const { userId } = req.params;
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current password and new password are required' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+  }
+
+  try {
+    // Get current user
+    db.get('SELECT * FROM users WHERE id = ?', [userId], async (err, user) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Verify current password
+      const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+
+      if (!isValidPassword) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+
+      // Hash new password
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password in database
+      db.run(
+        'UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [hashedNewPassword, userId],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Failed to update password' });
+          }
+
+          res.json({ message: 'Password changed successfully' });
+        }
+      );
+    });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 app.listen(PORT, () => {
