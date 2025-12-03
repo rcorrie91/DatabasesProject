@@ -22,6 +22,35 @@ function Dashboard() {
     fetchUserArtists();
   }, []);
 
+  // Heartbeat to keep session active
+  useEffect(() => {
+    const sendHeartbeat = async () => {
+      const sessionToken = localStorage.getItem('sessionToken');
+      if (sessionToken) {
+        try {
+          await fetch('http://localhost:3001/api/heartbeat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ sessionToken }),
+          });
+        } catch (error) {
+          console.error('Heartbeat failed:', error);
+        }
+      }
+    };
+
+    // Send initial heartbeat
+    sendHeartbeat();
+
+    // Send heartbeat every 2 minutes
+    const heartbeatInterval = setInterval(sendHeartbeat, 2 * 60 * 1000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(heartbeatInterval);
+  }, []);
+
   const fetchUserArtists = async () => {
     try {
       const response = await fetch(`http://localhost:3001/api/user/${currentUserId}/artists`);

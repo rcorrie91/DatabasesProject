@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import SearchableDropdown from './SearchableDropdown';
 import './ArtistTracker.css';
 
@@ -15,6 +15,35 @@ function ArtistTracker() {
 
   // For demo purposes - in production you'd get this from login session
   const currentUserId = 4; // Using one of our test users
+
+  // Heartbeat to keep session active
+  useEffect(() => {
+    const sendHeartbeat = async () => {
+      const sessionToken = localStorage.getItem('sessionToken');
+      if (sessionToken) {
+        try {
+          await fetch('http://localhost:3001/api/heartbeat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ sessionToken }),
+          });
+        } catch (error) {
+          console.error('Heartbeat failed:', error);
+        }
+      }
+    };
+
+    // Send initial heartbeat
+    sendHeartbeat();
+
+    // Send heartbeat every 2 minutes
+    const heartbeatInterval = setInterval(sendHeartbeat, 2 * 60 * 1000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(heartbeatInterval);
+  }, []);
 
   const handleArtistSelect = async (artistId, artistData) => {
     setSelectedArtist(artistData);

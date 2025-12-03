@@ -20,11 +20,12 @@ function generateSessionToken() {
 function createSession(userId, callback) {
   const sessionToken = generateSessionToken();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+  const now = new Date().toISOString();
 
   db.run(
-    `INSERT INTO user_sessions (user_id, session_token, expires_at, is_active)
-     VALUES (?, ?, ?, 1)`,
-    [userId, sessionToken, expiresAt.toISOString()],
+    `INSERT INTO user_sessions (user_id, session_token, expires_at, is_online, last_activity)
+     VALUES (?, ?, ?, 1, ?)`,
+    [userId, sessionToken, expiresAt.toISOString(), now],
     function(err) {
       if (err) {
         callback(err, null);
@@ -36,33 +37,51 @@ function createSession(userId, callback) {
 }
 
 // Helper function to validate session
+// A session is considered online only if last_activity was within the last 5 minutes
 function validateSession(sessionToken, callback) {
   db.get(
     `SELECT us.*, u.email, u.first_name, u.last_name, u.nickname
      FROM user_sessions us
      JOIN users u ON us.user_id = u.id
      WHERE us.session_token = ?
-       AND us.is_active = 1
-       AND datetime(us.expires_at) > datetime('now')`,
+       AND us.is_online = 1
+       AND datetime(us.expires_at) > datetime('now')
+       AND datetime(us.last_activity) > datetime('now', '-5 minutes')`,
     [sessionToken],
     callback
   );
 }
 
-// Helper function to deactivate session
+// Helper function to update last activity for a session
+function updateLastActivity(sessionToken, callback) {
+  const now = new Date().toISOString();
+  db.run(
+    `UPDATE user_sessions
+     SET last_activity = ?
+     WHERE session_token = ? AND is_online = 1`,
+    [now, sessionToken],
+    callback
+  );
+}
+
+// Helper function to deactivate session (set user offline)
 function deactivateSession(sessionToken, callback) {
   db.run(
-    `UPDATE user_sessions SET is_active = 0 WHERE session_token = ?`,
+    `UPDATE user_sessions SET is_online = 0 WHERE session_token = ?`,
     [sessionToken],
     callback
   );
 }
 
-// Helper function to clean up expired sessions
+// Helper function to clean up expired and inactive sessions
+// Sets users offline if their session has expired or they haven't been active in the last 5 minutes
 function cleanupExpiredSessions() {
   db.run(
-    `UPDATE user_sessions SET is_active = 0
-     WHERE is_active = 1 AND datetime(expires_at) < datetime('now')`,
+    `UPDATE user_sessions SET is_online = 0
+     WHERE is_online = 1 AND (
+       datetime(expires_at) < datetime('now')
+       OR datetime(last_activity) < datetime('now', '-5 minutes')
+     )`,
     (err) => {
       if (err) {
         console.error('Error cleaning up expired sessions:', err);
@@ -277,6 +296,13 @@ app.post('/api/validate-session', (req, res) => {
       return res.status(401).json({ error: 'Invalid or expired session' });
     }
 
+    // Update last activity when validating session
+    updateLastActivity(sessionToken, (updateErr) => {
+      if (updateErr) {
+        console.error('Error updating last activity:', updateErr);
+      }
+    });
+
     res.json({
       valid: true,
       user: {
@@ -291,12 +317,47 @@ app.post('/api/validate-session', (req, res) => {
   });
 });
 
-// Get active sessions for a user
+// Heartbeat endpoint to keep session active
+// Frontend should call this periodically while user is on the page
+app.post('/api/heartbeat', (req, res) => {
+  const { sessionToken } = req.body;
+
+  if (!sessionToken) {
+    return res.status(400).json({ error: 'Session token is required' });
+  }
+
+  validateSession(sessionToken, (err, session) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (!session) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    updateLastActivity(sessionToken, (updateErr) => {
+      if (updateErr) {
+        return res.status(500).json({ error: 'Failed to update activity' });
+      }
+
+      res.json({ message: 'Heartbeat received', active: true });
+    });
+  });
+});
+
+// Get sessions for a user with online status
 app.get('/api/user/:userId/sessions', (req, res) => {
   const { userId } = req.params;
 
   db.all(
-    `SELECT id, session_token, created_at, expires_at, is_active
+    `SELECT id, session_token, created_at, expires_at, is_online, last_activity,
+     CASE
+       WHEN is_online = 1
+         AND datetime(last_activity) > datetime('now', '-5 minutes')
+         AND datetime(expires_at) > datetime('now')
+       THEN 1
+       ELSE 0
+     END as currently_online
      FROM user_sessions
      WHERE user_id = ?
      ORDER BY created_at DESC`,
