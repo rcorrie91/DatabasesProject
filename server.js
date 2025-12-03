@@ -102,6 +102,22 @@ const db = new sqlite3.Database('./music_artists.db', (err) => {
       }
     });
 
+    db.run(`
+      ALTER TABLE user_artist_tracking ADD COLUMN rating INTEGER
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding rating column:', err);
+      }
+    });
+
+    db.run(`
+      ALTER TABLE user_artist_tracking ADD COLUMN rating_date DATE
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding rating_date column:', err);
+      }
+    });
+
     // Run cleanup on startup
     cleanupExpiredSessions();
     // Run cleanup every hour
@@ -399,16 +415,16 @@ app.get('/api/artists/:artistId', (req, res) => {
 // Add artist to user's tracking list
 app.post('/api/user/:userId/artists', (req, res) => {
   const { userId } = req.params;
-  const { artist_id, date_seen, venue, city, notes } = req.body;
+  const { artist_id, date_seen, venue, city, notes, rating, rating_date } = req.body;
 
   if (!artist_id) {
     return res.status(400).json({ error: 'Artist ID is required' });
   }
 
   db.run(
-    `INSERT INTO user_artist_tracking (user_id, artist_id, date_seen, venue, city, notes)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [userId, artist_id, date_seen || null, venue || null, city || null, notes || null],
+    `INSERT INTO user_artist_tracking (user_id, artist_id, date_seen, venue, city, notes, rating, rating_date)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [userId, artist_id, date_seen || null, venue || null, city || null, notes || null, rating || null, rating_date || null],
     function(err) {
       if (err) {
         return res.status(500).json({ error: 'Failed to add artist' });
@@ -465,6 +481,8 @@ app.get('/api/user/:userId/artists', (req, res) => {
        uat.venue,
        uat.city,
        uat.notes,
+       COALESCE(uat.rating, NULL) as rating,
+       uat.rating_date,
        a.artist_name,
        a.artist_img,
        a.country
@@ -478,7 +496,28 @@ app.get('/api/user/:userId/artists', (req, res) => {
         return res.status(500).json({ error: 'Database error' });
       }
 
-      res.json(artists);
+      if (artists.length === 0) {
+        return res.json([]);
+      }
+
+      let processedCount = 0;
+      artists.forEach((artist) => {
+        db.all(
+          'SELECT genre FROM artist_genres WHERE artist_id = ?',
+          [artist.artist_id],
+          (err, genres) => {
+            if (err) {
+              artist.genres = [];
+            } else {
+              artist.genres = genres.map(g => g.genre);
+            }
+            processedCount++;
+            if (processedCount === artists.length) {
+              res.json(artists);
+            }
+          }
+        );
+      });
     }
   );
 });
