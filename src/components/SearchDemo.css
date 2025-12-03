@@ -1,0 +1,83 @@
+.search-demo {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 2rem;
+}
+
+.search-demo-container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.search-demo h1 {
+  color: #333;
+  margin-bottom: 0.5rem;
+  font-size: 2rem;
+}
+
+.demo-description {
+  color: #666;
+  margin-bottom: 2rem;
+  font-size: 1rem;
+}
+
+.search-section {
+  margin-bottom: 2.5rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.search-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.search-section h2 {
+  color: #5b21b6;
+  margin-bottom: 1rem;
+  font-size: 1.4rem;
+}
+
+.selected-item-display {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: #f8f4ff;
+  border-radius: 8px;
+  border: 1px solid #e9d5ff;
+}
+
+.selected-item-display h3 {
+  margin: 0 0 1rem 0;
+  color: #5b21b6;
+  font-size: 1.1rem;
+}
+
+.artist-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.artist-card img {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.artist-card p {
+  margin: 0.5rem 0;
+  color: #333;
+}
+
+.selected-value {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+}

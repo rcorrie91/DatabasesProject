@@ -1,0 +1,134 @@
+.searchable-dropdown {
+  position: relative;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.dropdown-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.dropdown-input-container {
+  position: relative;
+}
+
+.dropdown-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.dropdown-input:focus {
+  outline: none;
+  border-color: #5b21b6;
+  box-shadow: 0 0 0 3px rgba(91, 33, 182, 0.1);
+}
+
+.dropdown-loading {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+  font-size: 1.2rem;
+}
+
+.dropdown-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0 0;
+}
+
+.dropdown-result-item {
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dropdown-result-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-result-item:hover {
+  background-color: #f8f4ff;
+}
+
+.dropdown-no-results {
+  padding: 1rem;
+  text-align: center;
+  color: #999;
+  font-style: italic;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+/* Artist-specific styling */
+.artist-result {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.artist-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.artist-info {
+  flex: 1;
+}
+
+.artist-name {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.artist-country {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+/* Scrollbar styling */
+.dropdown-results::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dropdown-results::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.dropdown-results::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.dropdown-results::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

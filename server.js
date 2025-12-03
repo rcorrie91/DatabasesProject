@@ -154,6 +154,103 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running' });
 });
 
+// Search artists endpoint
+app.get('/api/search/artists', (req, res) => {
+  const { query, limit = 20 } = req.query;
+
+  if (!query) {
+    return res.status(400).json({ error: 'Search query is required' });
+  }
+
+  db.all(
+    `SELECT artist_id, artist_name, artist_img, country
+     FROM artists
+     WHERE artist_name LIKE ?
+     ORDER BY artist_name
+     LIMIT ?`,
+    [`%${query}%`, parseInt(limit)],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      res.json(rows);
+    }
+  );
+});
+
+// Get all unique genres
+app.get('/api/search/genres', (req, res) => {
+  const { query } = req.query;
+
+  let sql = 'SELECT DISTINCT genre FROM artist_genres ORDER BY genre';
+  let params = [];
+
+  if (query) {
+    sql = 'SELECT DISTINCT genre FROM artist_genres WHERE genre LIKE ? ORDER BY genre';
+    params = [`%${query}%`];
+  }
+
+  db.all(sql, params, (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json(rows.map(row => row.genre));
+  });
+});
+
+// Get all unique countries
+app.get('/api/search/countries', (req, res) => {
+  const { query } = req.query;
+
+  let sql = 'SELECT DISTINCT country FROM artists WHERE country IS NOT NULL ORDER BY country';
+  let params = [];
+
+  if (query) {
+    sql = 'SELECT DISTINCT country FROM artists WHERE country IS NOT NULL AND country LIKE ? ORDER BY country';
+    params = [`%${query}%`];
+  }
+
+  db.all(sql, params, (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json(rows.map(row => row.country));
+  });
+});
+
+// Get artist by ID with genres
+app.get('/api/artists/:artistId', (req, res) => {
+  const { artistId } = req.params;
+
+  db.get(
+    'SELECT artist_id, artist_name, artist_img, country FROM artists WHERE artist_id = ?',
+    [artistId],
+    (err, artist) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (!artist) {
+        return res.status(404).json({ error: 'Artist not found' });
+      }
+
+      // Get genres for this artist
+      db.all(
+        'SELECT genre FROM artist_genres WHERE artist_id = ?',
+        [artistId],
+        (err, genres) => {
+          if (err) {
+            return res.status(500).json({ error: 'Database error' });
+          }
+
+          artist.genres = genres.map(g => g.genre);
+          res.json(artist);
+        }
+      );
+    }
+  );
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
