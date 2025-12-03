@@ -6,14 +6,17 @@ function Dashboard() {
   const navigate = useNavigate();
   const [selectedRatings, setSelectedRatings] = useState([]);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
-  const [filterFields, setFilterFields] = useState({ country: '', city: '', genre: '' });
+  const [selectedCountries, setSelectedCountries] = useState([]);
+  const [selectedCities, setSelectedCities] = useState([]);
+  const [selectedGenres, setSelectedGenres] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newArtist, setNewArtist] = useState({ artist: '', rating: '', date: '', city: '', country: '' });
   const [artists, setArtists] = useState([]);
+  const [allArtists, setAllArtists] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const ratingOptions = Array.from({ length: 10 }, (_, index) => (index + 1).toString());
 
-  const currentUserId = 4;
+  const currentUserId = 27;
 
   useEffect(() => {
     fetchUserArtists();
@@ -25,6 +28,7 @@ function Dashboard() {
       const data = await response.json();
 
       if (response.ok) {
+        setAllArtists(data);
         setArtists(data);
         console.log('All artists attached to account:', data);
         console.log('Total number of artists:', data.length);
@@ -35,7 +39,6 @@ function Dashboard() {
             artist_name: artist.artist_name,
             date_seen: artist.date_seen,
             rating: artist.rating,
-            rating_date: artist.rating_date,
             venue: artist.venue,
             city: artist.city,
             country: artist.country,
@@ -54,9 +57,306 @@ function Dashboard() {
     }
   };
 
-  const totalArtists = artists.length;
+  const getFilteredArtistsForOptions = () => {
+    let filtered = [...allArtists];
+
+    if (selectedRatings.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.rating && selectedRatings.includes(artist.rating.toString())
+      );
+    }
+
+    if (dateRange.start) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        return new Date(artist.date_seen) >= new Date(dateRange.start);
+      });
+    }
+
+    if (dateRange.end) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        return new Date(artist.date_seen) <= endDate;
+      });
+    }
+
+    if (selectedCountries.length > 0) {
+      filtered = filtered.filter(artist => {
+        const country = artist.event_country || artist.country;
+        return country && selectedCountries.includes(country);
+      });
+    }
+
+    if (selectedCities.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.city && selectedCities.includes(artist.city)
+      );
+    }
+
+    if (selectedGenres.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.genres && artist.genres.some(genre => selectedGenres.includes(genre))
+      );
+    }
+
+    return filtered;
+  };
+
+  const getAvailableRatings = () => {
+    let filtered = [...allArtists];
+
+    if (dateRange.start) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        return new Date(artist.date_seen) >= new Date(dateRange.start);
+      });
+    }
+
+    if (dateRange.end) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        return new Date(artist.date_seen) <= endDate;
+      });
+    }
+
+    if (selectedCountries.length > 0) {
+      filtered = filtered.filter(artist => {
+        const country = artist.event_country || artist.country;
+        return country && selectedCountries.includes(country);
+      });
+    }
+
+    if (selectedCities.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.city && selectedCities.includes(artist.city)
+      );
+    }
+
+    if (selectedGenres.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.genres && artist.genres.some(genre => selectedGenres.includes(genre))
+      );
+    }
+
+    return [...new Set(filtered.map(a => a.rating).filter(Boolean).map(r => r.toString()))].sort((a, b) => parseInt(a) - parseInt(b));
+  };
+
+  const getAvailableCountries = () => {
+    let filtered = [...allArtists];
+
+    if (selectedRatings.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.rating && selectedRatings.includes(artist.rating.toString())
+      );
+    }
+
+    if (dateRange.start) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        return new Date(artist.date_seen) >= new Date(dateRange.start);
+      });
+    }
+
+    if (dateRange.end) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        return new Date(artist.date_seen) <= endDate;
+      });
+    }
+
+    if (selectedCities.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.city && selectedCities.includes(artist.city)
+      );
+    }
+
+    if (selectedGenres.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.genres && artist.genres.some(genre => selectedGenres.includes(genre))
+      );
+    }
+
+    return [...new Set(filtered.map(a => a.event_country || a.country).filter(Boolean))].sort();
+  };
+
+  const getAvailableCities = () => {
+    let filtered = [...allArtists];
+
+    if (selectedRatings.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.rating && selectedRatings.includes(artist.rating.toString())
+      );
+    }
+
+    if (dateRange.start) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        return new Date(artist.date_seen) >= new Date(dateRange.start);
+      });
+    }
+
+    if (dateRange.end) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        return new Date(artist.date_seen) <= endDate;
+      });
+    }
+
+    if (selectedCountries.length > 0) {
+      filtered = filtered.filter(artist => {
+        const country = artist.event_country || artist.country;
+        return country && selectedCountries.includes(country);
+      });
+    }
+
+    if (selectedGenres.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.genres && artist.genres.some(genre => selectedGenres.includes(genre))
+      );
+    }
+
+    return [...new Set(filtered.map(a => a.city).filter(Boolean))].sort();
+  };
+
+  const getAvailableGenres = () => {
+    let filtered = [...allArtists];
+
+    if (selectedRatings.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.rating && selectedRatings.includes(artist.rating.toString())
+      );
+    }
+
+    if (dateRange.start) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        return new Date(artist.date_seen) >= new Date(dateRange.start);
+      });
+    }
+
+    if (dateRange.end) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        return new Date(artist.date_seen) <= endDate;
+      });
+    }
+
+    if (selectedCountries.length > 0) {
+      filtered = filtered.filter(artist => {
+        const country = artist.event_country || artist.country;
+        return country && selectedCountries.includes(country);
+      });
+    }
+
+    if (selectedCities.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.city && selectedCities.includes(artist.city)
+      );
+    }
+
+    return [...new Set(filtered.flatMap(a => a.genres || []).filter(Boolean))].sort();
+  };
+
+  const availableRatings = getAvailableRatings();
+  const availableCountries = getAvailableCountries();
+  const availableCities = getAvailableCities();
+  const availableGenres = getAvailableGenres();
+
+  useEffect(() => {
+    const validCountries = getAvailableCountries();
+    const validCities = getAvailableCities();
+    const validGenres = getAvailableGenres();
+    const validRatings = getAvailableRatings();
+
+    if (selectedCountries.length > 0) {
+      const invalidCountries = selectedCountries.filter(c => !validCountries.includes(c));
+      if (invalidCountries.length > 0) {
+        setSelectedCountries(prev => prev.filter(c => validCountries.includes(c)));
+      }
+    }
+
+    if (selectedCities.length > 0) {
+      const invalidCities = selectedCities.filter(c => !validCities.includes(c));
+      if (invalidCities.length > 0) {
+        setSelectedCities(prev => prev.filter(c => validCities.includes(c)));
+      }
+    }
+
+    if (selectedGenres.length > 0) {
+      const invalidGenres = selectedGenres.filter(g => !validGenres.includes(g));
+      if (invalidGenres.length > 0) {
+        setSelectedGenres(prev => prev.filter(g => validGenres.includes(g)));
+      }
+    }
+
+    if (selectedRatings.length > 0) {
+      const invalidRatings = selectedRatings.filter(r => !validRatings.includes(r));
+      if (invalidRatings.length > 0) {
+        setSelectedRatings(prev => prev.filter(r => validRatings.includes(r)));
+      }
+    }
+  }, [selectedRatings, dateRange, selectedCountries, selectedCities, selectedGenres, allArtists]);
+
+  useEffect(() => {
+    let filtered = [...allArtists];
+
+    if (selectedRatings.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.rating && selectedRatings.includes(artist.rating.toString())
+      );
+    }
+
+    if (dateRange.start) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        return new Date(artist.date_seen) >= new Date(dateRange.start);
+      });
+    }
+
+    if (dateRange.end) {
+      filtered = filtered.filter(artist => {
+        if (!artist.date_seen) return false;
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        return new Date(artist.date_seen) <= endDate;
+      });
+    }
+
+    if (selectedCountries.length > 0) {
+      filtered = filtered.filter(artist => {
+        const country = artist.event_country || artist.country;
+        return country && selectedCountries.includes(country);
+      });
+    }
+
+    if (selectedCities.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.city && selectedCities.includes(artist.city)
+      );
+    }
+
+    if (selectedGenres.length > 0) {
+      filtered = filtered.filter(artist => 
+        artist.genres && artist.genres.some(genre => selectedGenres.includes(genre))
+      );
+    }
+
+    setArtists(filtered);
+  }, [selectedRatings, dateRange, selectedCountries, selectedCities, selectedGenres, allArtists]);
+
+  const totalArtists = allArtists.length;
   const currentYear = new Date().getFullYear();
-  const artistsThisYear = artists.filter(artist => {
+  const artistsThisYear = allArtists.filter(artist => {
     if (!artist.date_seen) return false;
     const dateSeen = new Date(artist.date_seen);
     return dateSeen.getFullYear() === currentYear;
@@ -84,7 +384,32 @@ function Dashboard() {
       setDateRange((prev) => ({ ...prev, [name]: value }));
       return;
     }
-    setFilterFields((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const toggleCountry = (country) => {
+    setSelectedCountries((prev) =>
+      prev.includes(country) ? prev.filter((item) => item !== country) : [...prev, country]
+    );
+  };
+
+  const toggleCity = (city) => {
+    setSelectedCities((prev) =>
+      prev.includes(city) ? prev.filter((item) => item !== city) : [...prev, city]
+    );
+  };
+
+  const toggleGenre = (genre) => {
+    setSelectedGenres((prev) =>
+      prev.includes(genre) ? prev.filter((item) => item !== genre) : [...prev, genre]
+    );
+  };
+
+  const clearAllFilters = () => {
+    setSelectedRatings([]);
+    setDateRange({ start: '', end: '' });
+    setSelectedCountries([]);
+    setSelectedCities([]);
+    setSelectedGenres([]);
   };
 
   const handleModalInput = (e) => {
@@ -121,7 +446,9 @@ function Dashboard() {
       <div className="dashboard-content">
         <div className="dashboard-main">
           <div className="artists-section">
-            <h2 className="section-title">Artists You've Seen ({artists.length})</h2>
+            <h2 className="section-title">
+              Artists You've Seen {artists.length !== allArtists.length ? `(${artists.length} of ${allArtists.length})` : `(${artists.length})`}
+            </h2>
             {isLoading ? (
               <div className="empty-state">
                 <p>Loading artists...</p>
@@ -169,16 +496,11 @@ function Dashboard() {
                               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                             </svg>
                           </div>
-                          <div className="info-content">
-                            <div className="info-label">Rating</div>
-                            <div className="info-value">{artist.rating ? `${artist.rating}/10` : 'Not rated'}</div>
-                          </div>
-                          {artist.rating_date && (
-                            <div className="rating-date-badge">
-                              {new Date(artist.rating_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            <div className="info-content">
+                              <div className="info-label">Rating</div>
+                              <div className="info-value">{artist.rating ? `${artist.rating}/10` : 'Not rated'}</div>
                             </div>
-                          )}
-                        </div>
+                          </div>
                         {artist.venue && (
                           <div className="info-row">
                             <div className="info-icon-wrapper">
@@ -204,7 +526,7 @@ function Dashboard() {
                             </div>
                             <div className="info-content">
                               <div className="info-label">Location</div>
-                              <div className="info-value">{artist.city}{artist.country ? `, ${artist.country}` : ''}</div>
+                              <div className="info-value">{artist.city}{artist.event_country ? `, ${artist.event_country}` : artist.country ? `, ${artist.country}` : ''}</div>
                             </div>
                           </div>
                         )}
@@ -233,23 +555,27 @@ function Dashboard() {
           <div className="filters-panel">
             <div className="filters-header">
               <h3>Filters</h3>
-              <button className="plus-btn" onClick={() => setIsModalOpen(true)}>
-                +
+              <button className="clear-filters-btn" onClick={clearAllFilters}>
+                Clear
               </button>
             </div>
             <div className="filter-group">
               <div className="filter-label">Rating</div>
               <div className="filter-chips">
-                {ratingOptions.map((rating) => (
-                  <button
-                    key={rating}
-                    type="button"
-                    className={`filter-chip ${selectedRatings.includes(rating) ? 'active' : ''}`}
-                    onClick={() => toggleRating(rating)}
-                  >
-                    {rating}
-                  </button>
-                ))}
+                {ratingOptions.map((rating) => {
+                  const isAvailable = availableRatings.includes(rating);
+                  return (
+                    <button
+                      key={rating}
+                      type="button"
+                      className={`filter-chip ${selectedRatings.includes(rating) ? 'active' : ''} ${!isAvailable ? 'disabled' : ''}`}
+                      onClick={() => isAvailable && toggleRating(rating)}
+                      disabled={!isAvailable}
+                    >
+                      {rating}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="filter-group">
@@ -271,36 +597,48 @@ function Dashboard() {
             </div>
             <div className="filter-group">
               <div className="filter-label">Country</div>
-              <input
-                type="text"
-                name="country"
-                value={filterFields.country}
-                onChange={handleFilterInput}
-                placeholder="Search country"
-                className="filter-input"
-              />
+              <div className="filter-dropdown">
+                {availableCountries.map((country) => (
+                  <button
+                    key={country}
+                    type="button"
+                    className={`filter-chip ${selectedCountries.includes(country) ? 'active' : ''}`}
+                    onClick={() => toggleCountry(country)}
+                  >
+                    {country}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="filter-group">
               <div className="filter-label">City</div>
-              <input
-                type="text"
-                name="city"
-                value={filterFields.city}
-                onChange={handleFilterInput}
-                placeholder="Search city"
-                className="filter-input"
-              />
+              <div className="filter-dropdown">
+                {availableCities.map((city) => (
+                  <button
+                    key={city}
+                    type="button"
+                    className={`filter-chip ${selectedCities.includes(city) ? 'active' : ''}`}
+                    onClick={() => toggleCity(city)}
+                  >
+                    {city}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="filter-group">
               <div className="filter-label">Genre</div>
-              <input
-                type="text"
-                name="genre"
-                value={filterFields.genre}
-                onChange={handleFilterInput}
-                placeholder="Search genre"
-                className="filter-input"
-              />
+              <div className="filter-dropdown">
+                {availableGenres.map((genre) => (
+                  <button
+                    key={genre}
+                    type="button"
+                    className={`filter-chip ${selectedGenres.includes(genre) ? 'active' : ''}`}
+                    onClick={() => toggleGenre(genre)}
+                  >
+                    {genre}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

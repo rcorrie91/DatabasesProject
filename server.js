@@ -111,10 +111,10 @@ const db = new sqlite3.Database('./music_artists.db', (err) => {
     });
 
     db.run(`
-      ALTER TABLE user_artist_tracking ADD COLUMN rating_date DATE
+      ALTER TABLE user_artist_tracking ADD COLUMN event_country TEXT
     `, (err) => {
       if (err && !err.message.includes('duplicate column name')) {
-        console.error('Error adding rating_date column:', err);
+        console.error('Error adding event_country column:', err);
       }
     });
 
@@ -415,16 +415,16 @@ app.get('/api/artists/:artistId', (req, res) => {
 // Add artist to user's tracking list
 app.post('/api/user/:userId/artists', (req, res) => {
   const { userId } = req.params;
-  const { artist_id, date_seen, venue, city, notes, rating, rating_date } = req.body;
+  const { artist_id, date_seen, venue, city, notes, rating, event_country } = req.body;
 
   if (!artist_id) {
     return res.status(400).json({ error: 'Artist ID is required' });
   }
 
   db.run(
-    `INSERT INTO user_artist_tracking (user_id, artist_id, date_seen, venue, city, notes, rating, rating_date)
+    `INSERT INTO user_artist_tracking (user_id, artist_id, date_seen, venue, city, notes, rating, event_country)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [userId, artist_id, date_seen || null, venue || null, city || null, notes || null, rating || null, rating_date || null],
+    [userId, artist_id, date_seen || null, venue || null, city || null, notes || null, rating || null, event_country || null],
     function(err) {
       if (err) {
         return res.status(500).json({ error: 'Failed to add artist' });
@@ -482,10 +482,10 @@ app.get('/api/user/:userId/artists', (req, res) => {
        uat.city,
        uat.notes,
        COALESCE(uat.rating, NULL) as rating,
-       uat.rating_date,
+       uat.event_country,
        a.artist_name,
        a.artist_img,
-       a.country
+       a.country as artist_country
      FROM user_artist_tracking uat
      JOIN artists a ON uat.artist_id = a.artist_id
      WHERE uat.user_id = ?
